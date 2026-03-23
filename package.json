@@ -1,0 +1,17 @@
+{
+  "name": "smart-port-ai",
+  "version": "1.0.0",
+  "description": "Maritime Intelligence System — Strategic Unified Monorepo",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && python manage.py runserver",
+    "install:frontend": "cd frontend && npm install",
+    "status": "echo 'Frontend: /frontend | Backend: /backend | Screenshots: /docs/screenshots'"
+  },
+  "author": "Antigravity & OP_ALPHA",
+  "license": "MIT",
+  "devDependencies": {
+    "puppeteer": "^24.40.0"
+  }
+}
