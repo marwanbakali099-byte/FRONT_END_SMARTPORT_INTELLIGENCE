@@ -22,6 +22,16 @@ const getVesselStatus = (speed: number, isInPort: boolean) => {
   return { label: 'INCONNU', color: '#94a3b8', icon: '?' };
 };
 
+const getShipTypeInfo = (shipType: number | undefined) => {
+  if (!shipType) return { name: 'Unknown', color: '#94a3b8', shape: 'M10 2 L18 10 L10 18 L2 10 Z' }; // Diamond
+  if (shipType >= 30 && shipType < 40) return { name: 'Fishing', color: '#fbbf24', shape: 'M4 8 L16 8 L10 18 Z' }; // Triangle pointing down
+  if (shipType >= 40 && shipType < 50) return { name: 'High-Speed', color: '#f472b6', shape: 'M10 2 L14 18 L6 18 Z' }; // Narrow Triangle
+  if (shipType >= 60 && shipType < 70) return { name: 'Passenger', color: '#34d399', shape: 'M4 6 L16 6 L16 14 L4 14 Z' }; // Rectangle
+  if (shipType >= 70 && shipType < 80) return { name: 'Cargo', color: '#00d4ff', shape: 'M10 2 L18 10 L10 18 L2 10 Z' }; // Diamond
+  if (shipType >= 80 && shipType < 90) return { name: 'Tanker', color: '#f87171', shape: 'M4 10 A6 6 0 1 1 16 10 A6 6 0 1 1 4 10' }; // Circle-ish
+  return { name: 'Other', color: '#a78bfa', shape: 'M10 2 L18 10 L10 18 L2 10 Z' };
+};
+
 const getMarkerSize = (importance: number): number => {
   if (importance > 40) return 28;
   if (importance > 20) return 20;
@@ -76,23 +86,21 @@ function VesselMarker({ feature, onClick, isSelected }: { feature: DetectionFeat
   const importance = calculateImportance(feature);
   const size = getMarkerSize(importance);
 
+  const shipTypeInfo = getShipTypeInfo(props.ship_type);
+
   const icon = useMemo(() => {
-    const color = source === 'ais' ? '#00d4ff' : '#ff3366';
-    const svg = source === 'ais' 
-      ? `<div class="relative">
-          <div class="absolute inset-[-4px] animate-pulse-ring rounded-full" style="background: ${color}22"></div>
-          <svg width="${size}" height="${size}" viewBox="0 0 20 20" class="relative drop-shadow-[0_0_8px_${color}]">
-            <path d="M10 2 L18 10 L10 18 L2 10 Z" fill="${color}" stroke="white" stroke-width="1.5"/>
-            ${isSelected ? '<circle cx="10" cy="10" r="12" fill="none" stroke="white" stroke-width="2" stroke-dasharray="4 2"/>' : ''}
-          </svg>
-        </div>`
-      : `<div class="relative">
-          <div class="absolute inset-[-4px] animate-pulse-ring rounded-full" style="background: ${color}22"></div>
-          <svg width="${size}" height="${size}" viewBox="0 0 20 20" class="relative drop-shadow-[0_0_8px_${color}]">
-            <path d="M10 2 L19 18 L1 18 Z" fill="${color}" stroke="white" stroke-width="1.5"/>
-            ${isSelected ? '<circle cx="10" cy="18" r="12" fill="none" stroke="white" stroke-width="2" stroke-dasharray="4 2"/>' : ''}
-          </svg>
-        </div>`;
+    // If satellite detection, we can still use red, or just use the shipType color but maybe strobe it differently.
+    // Let's use the shipType color for AIS, and red for raw satellite anomalies.
+    const color = source === 'ais' ? shipTypeInfo.color : '#ff3366';
+    const shapePath = source === 'ais' ? shipTypeInfo.shape : 'M10 2 L19 18 L1 18 Z';
+
+    const svg = `<div class="relative">
+        <div class="absolute inset-[-4px] animate-pulse-ring rounded-full" style="background: ${color}22"></div>
+        <svg width="${size}" height="${size}" viewBox="0 0 20 20" class="relative drop-shadow-[0_0_8px_${color}]">
+          <path d="${shapePath}" fill="${color}" stroke="white" stroke-width="1.5"/>
+          ${isSelected ? '<circle cx="10" cy="10" r="12" fill="none" stroke="white" stroke-width="2" stroke-dasharray="4 2"/>' : ''}
+        </svg>
+      </div>`;
 
     return L.divIcon({
       html: svg,
@@ -100,7 +108,7 @@ function VesselMarker({ feature, onClick, isSelected }: { feature: DetectionFeat
       iconSize: [size, size],
       iconAnchor: [size/2, size/2],
     });
-  }, [source, isSelected, size]);
+  }, [source, isSelected, size, shipTypeInfo]);
 
   const [displayTime, setDisplayTime] = useState(timeAgo(timestamp));
 
@@ -120,7 +128,9 @@ function VesselMarker({ feature, onClick, isSelected }: { feature: DetectionFeat
       <Popup className="premium-popup">
         <div className="min-w-[220px] p-2">
           <div className="flex items-center justify-between mb-2 text-primary">
-            <span className="text-[9px] font-bold text-accent-primary uppercase tracking-[0.2em]">{source === 'ais' ? 'AIS Feed' : 'Satellite Detection'}</span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: shipTypeInfo.color }}>
+              {source === 'ais' ? `AIS: ${shipTypeInfo.name}` : 'Satellite Anomaly'}
+            </span>
             <span className="text-[9px] font-mono text-text-muted">{displayTime}</span>
           </div>
           <p className="text-lg font-black font-mono text-text-primary mb-1 tracking-tight">{mmsi}</p>
