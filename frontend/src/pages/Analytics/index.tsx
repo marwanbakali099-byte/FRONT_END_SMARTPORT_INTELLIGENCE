@@ -3,9 +3,9 @@ import { getPortStatus, getPortCongestionIA, getPortAnalytics } from '../../api/
 import { getDetections } from '../../api/detections';
 import { KPICard, StatusBadge, LoadingSkeleton, ErrorState, GlassCard } from '../../components/ui/SharedUI';
 import { formatETA } from '../../utils/formatters';
-import { Ship, Anchor, Brain, Activity, BarChart, Target, Clock, Zap, TrendingUp, Gauge, Waves, Radar } from 'lucide-react';
+import { Ship, Anchor, Brain, Activity, Target, Clock, Zap, TrendingUp, Gauge, Waves, Radar } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import {
   AreaChart,
@@ -15,11 +15,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart as ReBarChart,
-  Bar,
 } from 'recharts';
 import type { PortStatusResponse, PortCongestionIAResponse, PortAnalyticsResponse } from '../../types/models';
 
@@ -220,7 +215,7 @@ export default function Analytics() {
         <KPICard
           title="Predictive Reliability"
           value={`${confidencePercent}%`}
-          subtitle={congestionIA ? `MODEL: ${congestionIA.model_info.split('—')[0]}` : 'ANALYZING...'}
+          subtitle={congestionIA ? `MODEL: ${(congestionIA.model_info ?? 'XGBoost').split('—')[0]}` : 'ANALYZING...'}
           icon={<Brain className="w-5 h-5" />}
           color="accent"
           index={4}
@@ -595,27 +590,34 @@ export default function Analytics() {
                 </div>
 
                 {/* Vessel manifest */}
-                {portStatus.vessels_list.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">Active Vessel Manifest</p>
-                      <span className="text-[9px] font-mono font-bold text-accent-primary">{portStatus.vessels_list.length} TRACKED</span>
+                {/* Vessel manifest — works with both real (boats: string[]) and mock (vessels_list) */}
+                {(() => {
+                  const vesselsMmsi: string[] = portStatus.vessels_list
+                    ? portStatus.vessels_list.map((v) => v.mmsi)
+                    : portStatus.boats ?? [];
+                  if (vesselsMmsi.length === 0) return null;
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">Active Vessel Manifest</p>
+                        <span className="text-[9px] font-mono font-bold text-accent-primary">{vesselsMmsi.length} TRACKED</span>
+                      </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                        {vesselsMmsi.slice(0, 6).map((mmsi) => (
+                          <div key={mmsi} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-bg-elevated/20 border border-bg-border/30 text-[11px] font-mono font-bold text-text-primary hover:bg-bg-elevated/40 hover:border-accent-primary/20 transition-all group">
+                            <Ship className="w-3 h-3 text-text-muted group-hover:text-accent-primary transition-colors" />
+                            {mmsi}
+                          </div>
+                        ))}
+                        {vesselsMmsi.length > 6 && (
+                          <div className="flex items-center justify-center p-2.5 text-[9px] font-bold text-text-muted uppercase tracking-widest bg-bg-elevated/10 rounded-lg border border-dashed border-bg-border hover:border-accent-primary/30 transition-colors">
+                            + {vesselsMmsi.length - 6} more
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                      {portStatus.vessels_list.slice(0, 6).map((v) => (
-                        <div key={v.mmsi} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-bg-elevated/20 border border-bg-border/30 text-[11px] font-mono font-bold text-text-primary hover:bg-bg-elevated/40 hover:border-accent-primary/20 transition-all group">
-                          <Ship className="w-3 h-3 text-text-muted group-hover:text-accent-primary transition-colors" />
-                          {v.mmsi}
-                        </div>
-                      ))}
-                      {portStatus.vessels_list.length > 6 && (
-                        <div className="flex items-center justify-center p-2.5 text-[9px] font-bold text-text-muted uppercase tracking-widest bg-bg-elevated/10 rounded-lg border border-dashed border-bg-border hover:border-accent-primary/30 transition-colors">
-                          + {portStatus.vessels_list.length - 6} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {portStatus.avg_eta_minutes && (
                   <div className="p-4 rounded-lg border border-accent-primary/20 bg-accent-glow flex items-center justify-between">

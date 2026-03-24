@@ -34,36 +34,41 @@ export default function Vessels() {
   const { data, isLoading } = useQuery({
     queryKey: ['detections'],
     queryFn: getDetections,
+    refetchInterval: 5000,
   });
 
   const vessels = useMemo(() => {
     if (!data?.features) return [];
     const map = new Map<string, VesselRow>();
     data.features.forEach((f: DetectionFeature) => {
-      const { mmsi, source, speed, timestamp, eta_minutes } = f.properties;
-      const [lon, lat] = f.geometry.coordinates;
-      const existing = map.get(mmsi);
+      const props = f.properties || {};
+      const { source, speed, timestamp, eta_minutes } = props;
+      const mmsi = props.mmsi || f.id;
+      const [lon, lat] = f.geometry?.coordinates || [0, 0];
+      const mmsiStr = String(mmsi || '');
+      const existing = map.get(mmsiStr);
       
       // Determine status based on speed
       let status = 'MOUILLÉ';
-      if (speed > 5) status = 'EN ROUTE';
-      else if (speed > 0.5) status = 'MANOEUVRE';
-      else if (mmsi.endsWith('1')) status = 'À QUAI'; // mock some at dock
+      if ((speed ?? 0) > 5) status = 'EN ROUTE';
+      else if ((speed ?? 0) > 0.5) status = 'MANOEUVRE';
+      else if (mmsiStr.endsWith('1')) status = 'À QUAI'; // mock some at dock
 
-      if (!existing || new Date(timestamp) > new Date(existing.timestamp)) {
-        map.set(mmsi, {
-          mmsi,
-          source,
-          lat,
-          lon,
-          speed,
-          timestamp,
+      const validTimestamp = timestamp || new Date().toISOString();
+      if (!existing || new Date(validTimestamp) > new Date(existing.timestamp)) {
+        map.set(mmsiStr, {
+          mmsi: mmsiStr,
+          source: source || 'unknown',
+          lat: lat || 0,
+          lon: lon || 0,
+          speed: speed ?? 0,
+          timestamp: timestamp || new Date().toISOString(),
           eta_minutes: eta_minutes ?? null,
           status,
           detectionCount: (existing?.detectionCount || 0) + 1,
         });
       } else {
-        map.set(mmsi, { ...existing, detectionCount: existing.detectionCount + 1 });
+        map.set(mmsiStr, { ...existing, detectionCount: existing.detectionCount + 1 });
       }
     });
     return Array.from(map.values());

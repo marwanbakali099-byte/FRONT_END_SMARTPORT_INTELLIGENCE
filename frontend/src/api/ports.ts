@@ -1,20 +1,15 @@
-import { apiClient, USE_MOCK, simulateDelay } from './client';
-import { mockPorts } from '../mock';
+import { KNOWN_PORTS } from '../types/models';
 import type { PortInfo } from '../types/models';
 
+/**
+ * The Django backend has no /api/ports/ list endpoint.
+ * We use KNOWN_PORTS (static) as the port catalog.
+ * Individual port status/congestion comes from /api/port/status/ and /api/analytics/congestion/
+ */
 export async function getPorts(): Promise<PortInfo[]> {
-  if (USE_MOCK) {
-    return simulateDelay(mockPorts);
-  }
-  // Fallback to real API when backend implements this
-  const { data } = await apiClient.get<PortInfo[]>('/ports/');
-  return data;
+  return Promise.resolve(KNOWN_PORTS);
 }
 
 export async function getPortById(id: number): Promise<PortInfo | undefined> {
-  if (USE_MOCK) {
-    return simulateDelay(mockPorts.find((p) => p.id === id));
-  }
-  const { data } = await apiClient.get<PortInfo>(`/ports/${id}/`);
-  return data;
+  return Promise.resolve(KNOWN_PORTS.find((p) => p.id === id));
 }

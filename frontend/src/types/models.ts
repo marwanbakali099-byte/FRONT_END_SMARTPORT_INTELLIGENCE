@@ -123,11 +123,13 @@ export interface PortHistoricalPoint {
 
 export interface PortAnalyticsResponse {
   port_id: number;
-  port_name: string;
   boats_in_port: number;
-  congestion: 'LOW' | 'MEDIUM' | 'HIGH';
-  avg_eta_minutes: number;
-  historical_data: PortHistoricalPoint[];
+  congestion_level: 'LOW' | 'MEDIUM' | 'HIGH';
+  // Extended fields only present in mock / future backend:
+  port_name?: string;
+  congestion?: 'LOW' | 'MEDIUM' | 'HIGH';
+  avg_eta_minutes?: number;
+  historical_data?: PortHistoricalPoint[];
 }
 
 // GET /api/eta/{mmsi}/
@@ -135,30 +137,33 @@ export interface BoatETAResponse {
   mmsi: string;
   nom: string;
   type?: number;
-  type_bateau: string;
   vitesse_actuelle: number;
   port_destination: string;
   eta_predite_minutes: number;
-  confidence_score: number;
-  last_seen: string;
   timestamp_actuel: string;
+  // Optional fields that may or may not be present:
+  type_bateau?: string;
+  confidence_score?: number;
+  last_seen?: string;
 }
 
 // GET /api/port/status/{port_id}/
 export interface PortStatusResponse {
   port_id: number;
-  port_name: string;
   boats_in_port: number;
-  congestion: 'LOW' | 'MEDIUM' | 'HIGH';
+  boats: string[];
   avg_eta_minutes: number;
-  coordinates: [number, number];
-  vessels_list: Array<{
+  congestion: 'LOW' | 'MEDIUM' | 'HIGH';
+  // Fields only in mock / future backend:
+  port_name?: string;
+  coordinates?: [number, number];
+  vessels_list?: Array<{
     mmsi: string;
     name: string;
     eta_minutes: number;
     status: string;
   }>;
-  arrival_timeline: Array<{
+  arrival_timeline?: Array<{
     time: string;
     vessel: string;
     type: 'ARRIVÉE' | 'DÉPART';
@@ -167,13 +172,10 @@ export interface PortStatusResponse {
 
 // GET /api/analytics/congestion/{port_id}/
 export interface PortCongestionIAResponse {
-  port_id: number;
   port_name: string;
   congestion_predictive_ia: 'LOW' | 'MEDIUM' | 'HIGH';
   confidence_score: number;
-  boats_in_port: number;
   last_update: string;
-  model_info: string;
   details: {
     port_id: number;
     port_name: string;
@@ -183,6 +185,24 @@ export interface PortCongestionIAResponse {
     congestion: string;
     confidence: number;
   };
+  // Optional fields from mock:
+  port_id?: number;
+  boats_in_port?: number;
+  model_info?: string;
+}
+
+// GET /api/video/stats/
+export interface VideoDetectionRecord {
+  id: number;
+  vitesse: number;
+  heure: string;
+  confiance: number;
+}
+
+export interface VideoStatsResponse {
+  status: string;
+  total_records: number;
+  last_detections: VideoDetectionRecord[];
 }
 
 // POST /api/satellite/detect/ (from screenshot)

@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getPortStatus } from '../../api/analytics';
 import { LoadingSkeleton, StatusBadge } from '../ui/SharedUI';
-import { Ship, X, Anchor, Clock, MapPin, Activity } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Ship, X, Clock, MapPin, Activity } from 'lucide-react';
 import type { PortStatusResponse } from '../../types/models';
 
 interface PortStatusPanelProps {
@@ -27,10 +26,12 @@ export function PortStatusPanel({ portId, onClose }: PortStatusPanelProps) {
               <div className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-pulse" />
               <span className="text-[10px] font-black tracking-[0.2em] text-accent-primary uppercase font-display">Hub Intelligence</span>
             </div>
-            <h3 className="text-2xl font-black text-text-primary tracking-tight font-mono">{data?.port_name || 'Loading Hub...'}</h3>
+            <h3 className="text-2xl font-black text-text-primary tracking-tight font-mono">{data?.port_name || `Hub #${portId}`}</h3>
             <div className="flex items-center gap-2 mt-2">
               <MapPin className="w-3 h-3 text-text-muted" />
-              <span className="text-[10px] font-mono text-text-muted">{data?.coordinates[1].toFixed(4)}, {data?.coordinates[0].toFixed(4)}</span>
+              <span className="text-[10px] font-mono text-text-muted">
+                {data?.coordinates ? `${data.coordinates[1].toFixed(4)}, ${data.coordinates[0].toFixed(4)}` : '—'}
+              </span>
             </div>
           </div>
           <button
@@ -78,63 +79,65 @@ export function PortStatusPanel({ portId, onClose }: PortStatusPanelProps) {
               </div>
             </div>
 
-            {/* Vessel Manifest */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Ship className="w-4 h-4 text-accent-primary" />
-                  <span className="text-[10px] font-bold text-text-primary uppercase tracking-widest">Active Manifest</span>
+            {/* Vessel Manifest — works with real (boats: string[]) or mock (vessels_list) */}
+            {(() => {
+              const mmsiList: string[] = data.vessels_list
+                ? data.vessels_list.map((v) => v.mmsi)
+                : data.boats ?? [];
+              if (mmsiList.length === 0) return null;
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Ship className="w-4 h-4 text-accent-primary" />
+                      <span className="text-[10px] font-bold text-text-primary uppercase tracking-widest">Active Manifest</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-text-muted">{mmsiList.length} TARGETS</span>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    {mmsiList.map((mmsi) => (
+                      <div key={mmsi} className="flex items-center justify-between p-3 rounded border border-bg-border bg-bg-base/30 hover:border-accent-primary/30 transition-colors group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded bg-bg-elevated flex items-center justify-center text-accent-primary group-hover:bg-accent-glow transition-colors">
+                            <Ship className="w-4 h-4" />
+                          </div>
+                          <p className="text-xs font-bold text-text-primary font-mono">{mmsi}</p>
+                        </div>
+                        <span className="text-[9px] font-black text-accent-primary uppercase">BERTHED</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <span className="text-[9px] font-mono text-text-muted">{data.vessels_list.length} TARGETS</span>
-              </div>
-              
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                {data.vessels_list.map((v) => (
-                  <div key={v.mmsi} className="flex items-center justify-between p-3 rounded border border-bg-border bg-bg-base/30 hover:border-accent-primary/30 transition-colors group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded bg-bg-elevated flex items-center justify-center text-accent-primary group-hover:bg-accent-glow transition-colors">
-                        <Ship className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-text-primary">{v.name}</p>
-                        <p className="text-[9px] font-mono text-text-muted">{v.mmsi}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[9px] font-black text-accent-primary uppercase tracking-tighter">{v.status}</p>
-                      <p className="text-[9px] font-mono text-text-muted">{v.eta_minutes > 0 ? `${v.eta_minutes}m` : 'À QUAI'}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+              );
+            })()}
 
-            {/* Arrival Timeline */}
-            <div className="space-y-4 pt-4 border-t border-bg-border">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-text-muted" />
-                <span className="text-[10px] font-bold text-text-primary uppercase tracking-widest">Operations Timeline</span>
-              </div>
-              
-              <div className="space-y-4 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-bg-border">
-                {data.arrival_timeline.map((event, i) => (
-                  <div key={i} className="relative pl-8">
-                    <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-bg-base flex items-center justify-center z-10 ${event.type === 'ARRIVÉE' ? 'bg-status-safe' : 'bg-accent-dim'}`}>
-                      <div className="w-1.5 h-1.5 bg-white rounded-full" />
-                    </div>
-                    <div className="p-3 rounded bg-bg-surface/50 border border-bg-border/50">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-black text-text-primary">{event.vessel}</span>
-                        <span className="text-[9px] font-mono text-accent-primary">{event.time}</span>
+            {/* Arrival Timeline — optional in real backend */}
+            {(data.arrival_timeline?.length ?? 0) > 0 && (
+              <div className="space-y-4 pt-4 border-t border-bg-border">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-text-muted" />
+                  <span className="text-[10px] font-bold text-text-primary uppercase tracking-widest">Operations Timeline</span>
+                </div>
+                <div className="space-y-4 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-bg-border">
+                  {data.arrival_timeline!.map((event, i) => (
+                    <div key={i} className="relative pl-8">
+                      <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-bg-base flex items-center justify-center z-10 ${event.type === 'ARRIVÉE' ? 'bg-status-safe' : 'bg-accent-dim'}`}>
+                        <div className="w-1.5 h-1.5 bg-white rounded-full" />
                       </div>
-                      <p className={`text-[8px] font-bold uppercase tracking-widest ${event.type === 'ARRIVÉE' ? 'text-status-safe' : 'text-accent-primary'}`}>
-                        {event.type}
-                      </p>
+                      <div className="p-3 rounded bg-bg-surface/50 border border-bg-border/50">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] font-black text-text-primary">{event.vessel}</span>
+                          <span className="text-[9px] font-mono text-accent-primary">{event.time}</span>
+                        </div>
+                        <p className={`text-[8px] font-bold uppercase tracking-widest ${event.type === 'ARRIVÉE' ? 'text-status-safe' : 'text-accent-primary'}`}>
+                          {event.type}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

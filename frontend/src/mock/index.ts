@@ -11,13 +11,6 @@ import type {
   SatelliteDetectResponse,
 } from '../types/models';
 
-function generateRandomPastDate(hoursAgo: number): string {
-  const d = new Date();
-  d.setHours(d.getHours() - hoursAgo);
-  d.setMinutes(Math.floor(Math.random() * 60));
-  return d.toISOString();
-}
-
 // ==========================================
 // 1. PORTS
 // ==========================================
@@ -101,35 +94,15 @@ export const mockAnalyticsData: Record<number, PortAnalyticsResponse> = {
     port_id: 6,
     port_name: "Tanger Ville",
     boats_in_port: 11,
-    congestion: "MEDIUM",
+    congestion_level: "MEDIUM",
     avg_eta_minutes: 24,
-    historical_data: [
-      { time: "08:00", boats: 6,  congestion: "LOW"    },
-      { time: "10:00", boats: 9,  congestion: "LOW"    },
-      { time: "12:00", boats: 11, congestion: "MEDIUM" },
-      { time: "14:00", boats: 14, congestion: "MEDIUM" },
-      { time: "16:00", boats: 18, congestion: "HIGH"   },
-      { time: "18:00", boats: 15, congestion: "MEDIUM" },
-      { time: "20:00", boats: 11, congestion: "MEDIUM" },
-      { time: "22:00", boats: 7,  congestion: "LOW"    }
-    ]
   },
   7: {
     port_id: 7,
     port_name: "Tanger Med",
     boats_in_port: 18,
-    congestion: "HIGH",
+    congestion_level: "HIGH",
     avg_eta_minutes: 47,
-    historical_data: [
-      { time: "08:00", boats: 12, congestion: "MEDIUM" },
-      { time: "10:00", boats: 15, congestion: "MEDIUM" },
-      { time: "12:00", boats: 22, congestion: "HIGH"   },
-      { time: "14:00", boats: 25, congestion: "HIGH"   },
-      { time: "16:00", boats: 28, congestion: "HIGH"   },
-      { time: "18:00", boats: 24, congestion: "HIGH"   },
-      { time: "20:00", boats: 18, congestion: "HIGH"   },
-      { time: "22:00", boats: 14, congestion: "MEDIUM" }
-    ]
   }
 };
 
@@ -148,17 +121,12 @@ export const mockPortStatusData: Record<number, PortStatusResponse> = {
     congestion: "HIGH",
     avg_eta_minutes: 47,
     coordinates: [-5.5068, 35.8847],
-    vessels_list: [
-      { mmsi: "242000001", name: "MSC TANGER",    eta_minutes: 47,  status: "EN APPROCHE" },
-      { mmsi: "242000003", name: "MARSA CARGO II", eta_minutes: 0,  status: "À QUAI"      },
-      { mmsi: "242000005", name: "ATLAS FERRY",    eta_minutes: 112, status: "EN APPROCHE" },
-      { mmsi: "242000002", name: "TANGER EXPRESS", eta_minutes: 15,  status: "EN APPROCHE" },
-      { mmsi: "242000004", name: "MEDITERRANEAN SEA", eta_minutes: 0,  status: "À QUAI"      },
-    ],
-    arrival_timeline: [
-      { time: "13:45", vessel: "MSC TANGER",     type: "ARRIVÉE" },
-      { time: "12:20", vessel: "ATLAS FERRY",    type: "DÉPART"  },
-      { time: "11:05", vessel: "NADOR EXPRESS",  type: "ARRIVÉE" }
+    boats: [
+      "242000001",
+      "242000003",
+      "242000005",
+      "242000002",
+      "242000004",
     ]
   }
 };

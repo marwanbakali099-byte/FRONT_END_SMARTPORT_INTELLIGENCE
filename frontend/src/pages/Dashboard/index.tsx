@@ -11,8 +11,8 @@ import { Ship, X, AlertTriangle, Anchor, Target, Camera, Activity, ShieldAlert, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { MagneticButton } from '../../components/ui/SharedUI';
-import { mockSatelliteDetection } from '../../mock'; 
 import { PortStatusPanel } from '../../components/port/PortStatusPanel';
+import { useNavigate } from 'react-router-dom';
 
 const getVesselStatus = (speed: number, isInPort: boolean) => {
   if (speed > 5) return { label: 'EN MOUVEMENT', color: '#00ff88', icon: '●' };
@@ -29,9 +29,12 @@ const getMarkerSize = (importance: number): number => {
 };
 
 const calculateImportance = (feature: DetectionFeature) => {
-  const { speed, ship_type } = feature.properties;
+  const props = feature.properties || {};
+  const speed = props.speed ?? 0;
+  const ship_type = props.ship_type;
   const isCargo = ship_type === 70;
-  const isSuspect = speed === 0 && !feature.properties.mmsi.startsWith('242');
+  const mmsiStr = String(props.mmsi || '');
+  const isSuspect = speed === 0 && !mmsiStr.startsWith('242');
   return (speed ?? 0) * 0.3 + (isCargo ? 20 : 0) + (isSuspect ? 30 : 0);
 };
 
@@ -55,8 +58,12 @@ function MapStateTracker({ onMove }: { onMove: (center: [number, number], zoom: 
 }
 
 function VesselMarker({ feature, onClick, isSelected }: { feature: DetectionFeature; onClick: (mmsi: string) => void; isSelected: boolean }) {
-  const { mmsi, source, speed, timestamp } = feature.properties;
-  const [lon, lat] = feature.geometry.coordinates;
+  const props = feature.properties || {};
+  const mmsi = String(props.mmsi || feature.id || '');
+  const source = props.source || 'unknown';
+  const speed = props.speed ?? 0;
+  const timestamp = props.timestamp || new Date().toISOString();
+  const [lon, lat] = feature.geometry?.coordinates || [0, 0];
   
   const { data: etaData } = useQuery({
     queryKey: ['vessel-eta-bg', mmsi],
@@ -184,7 +191,9 @@ function VesselDetailPanel({ mmsi, onClose }: { mmsi: string; onClose: () => voi
                 <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Mission Profile</span>
               </div>
               <h4 className="text-xl font-bold text-text-primary uppercase tracking-tight mb-1">{data.nom}</h4>
-              <p className="text-[10px] font-mono text-accent-primary/70">{data.type_bateau}</p>
+              {data.type_bateau && (
+                <p className="text-[10px] font-mono text-accent-primary/70">{data.type_bateau}</p>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -193,7 +202,7 @@ function VesselDetailPanel({ mmsi, onClose }: { mmsi: string; onClose: () => voi
                   <Target className="w-4 h-4 text-accent-primary" />
                   <span className="text-[10px] font-bold text-text-primary uppercase tracking-widest">AI Prediction Layer</span>
                 </div>
-                <span className="text-[10px] font-mono text-status-safe font-bold">{(data.confidence_score * 100).toFixed(1)}% CONF</span>
+                <span className="text-[10px] font-mono text-status-safe font-bold">{((data.confidence_score ?? 0) * 100).toFixed(1)}% CONF</span>
               </div>
               
               <div className="grid grid-cols-2 gap-3">
@@ -224,7 +233,7 @@ function VesselDetailPanel({ mmsi, onClose }: { mmsi: string; onClose: () => voi
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-bg-border/50">
                   <span className="text-[10px] text-text-muted uppercase font-bold">Dernière position</span>
-                  <span className="text-xs font-mono text-accent-primary">{timeAgo(data.last_seen)}</span>
+                  <span className="text-xs font-mono text-accent-primary">{timeAgo(data.last_seen ?? data.timestamp_actuel)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-[10px] text-text-muted uppercase font-bold">Uplink Status</span>
@@ -243,15 +252,14 @@ export default function Dashboard() {
   const { selectedMmsi, selectVessel, clearSelection, sidebarOpen } = useVesselStore();
   const [sourceFilter, setSourceFilter] = useState<'all' | 'ais' | 'satellite'>('all');
   const [selectedPortId, setSelectedPortId] = useState<number | null>(null);
-  const [satelliteMode, setSatelliteMode] = useState(false);
-  const [cameraMode, setCameraMode] = useState(false);
   const [heatmapEnabled, setHeatmapEnabled] = useState(false);
   const [activeAlert, setActiveAlert] = useState<{ mmsi: string } | null>(null);
-  const [simulationTick, setSimulationTick] = useState(0);
+
   const [mapCenter, setMapCenter] = useState<[number, number]>([35.84, -5.65]);
   const [mapZoom, setMapZoom] = useState(10);
   const [time, setTime] = useState(new Date());
   const mapRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -270,51 +278,44 @@ export default function Dashboard() {
     return data.features.filter((f) => f.properties.source === sourceFilter);
   }, [data, sourceFilter]);
 
-  useEffect(() => {
-    const interval = setInterval(() => setSimulationTick((t) => t + 1), 5000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   const uniqueVessels = useMemo(() => {
     const map = new Map<string, DetectionFeature>();
     filteredFeatures.forEach((f) => {
-      const existing = map.get(f.properties.mmsi);
-      if (!existing || new Date(f.properties.timestamp) > new Date(existing.properties.timestamp)) {
-        map.set(f.properties.mmsi, JSON.parse(JSON.stringify(f)));
+      const props = f.properties || {};
+      const mmsiKey = String(props.mmsi || f.id || '');
+      const existing = map.get(mmsiKey);
+      const timestamp = props.timestamp || new Date().toISOString();
+      if (!existing || new Date(timestamp) > new Date((existing.properties || {}).timestamp || 0)) {
+        map.set(mmsiKey, JSON.parse(JSON.stringify(f)));
       }
     });
     
-    return Array.from(map.values()).map(f => {
-      if (f.properties.speed > 1 && simulationTick > 0) {
-        const hash = f.properties.mmsi.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-        const headingRad = (hash % 360) * (Math.PI / 180);
-        const offset = simulationTick * (f.properties.speed * 0.0002);
-        f.geometry.coordinates[0] += offset * Math.cos(headingRad);
-        f.geometry.coordinates[1] += offset * Math.sin(headingRad);
-      }
-      return f;
-    });
-  }, [filteredFeatures, simulationTick]);
+    return Array.from(map.values());
+  }, [filteredFeatures]);
 
   useEffect(() => {
     if (uniqueVessels.length > 0) {
       const suspicious = uniqueVessels.find(v => {
-        const { speed, mmsi } = v.properties;
-        const [lon, lat] = v.geometry.coordinates;
+        const props = v.properties || {};
+        const speed = props.speed ?? 0;
+        const mmsi = String(props.mmsi || '');
+        const [lon, lat] = v.geometry?.coordinates || [0, 0];
         const isInPort = (Math.abs(lat - 35.89) < 0.02 || Math.abs(lat - 35.78) < 0.02);
         void lon;
         return speed === 0 && !isInPort && !mmsi.startsWith('242');
       });
 
       if (suspicious && !activeAlert) {
-         setActiveAlert({ mmsi: suspicious.properties.mmsi });
+         setActiveAlert({ mmsi: String(suspicious.properties?.mmsi || suspicious.id || '') });
          setTimeout(() => setActiveAlert(null), 10000);
       }
     }
   }, [uniqueVessels, activeAlert]);
 
-  const aisCount = uniqueVessels.filter((v) => v.properties.source === 'ais').length;
-  const satCount = uniqueVessels.filter((v) => v.properties.source === 'satellite').length;
+  const aisCount = uniqueVessels.filter((v) => (v.properties?.source) === 'ais').length;
+  const satCount = uniqueVessels.filter((v) => (v.properties?.source) === 'satellite').length;
 
   return (
     <div className="relative h-[calc(100vh-64px)] overflow-hidden bg-bg-base">
@@ -329,6 +330,7 @@ export default function Dashboard() {
         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='&copy; CARTO' />
         
         {heatmapEnabled && uniqueVessels.map((f, i) => (
+          f.geometry?.coordinates ? (
           <CircleMarker
             key={`heat-${i}`}
             center={[f.geometry.coordinates[1], f.geometry.coordinates[0]]}
@@ -339,10 +341,11 @@ export default function Dashboard() {
               stroke: false
             }}
           />
+          ) : null
         ))}
 
         {uniqueVessels.map((f) => (
-          <VesselMarker key={f.properties.mmsi} feature={f} onClick={selectVessel} isSelected={selectedMmsi === f.properties.mmsi} />
+          <VesselMarker key={f.properties?.mmsi || f.id} feature={f} onClick={selectVessel} isSelected={selectedMmsi === (f.properties?.mmsi || f.id)} />
         ))}
         {[
           { pos: [35.788, -5.808], name: "Tanger Ville", id: 6 },
@@ -392,13 +395,13 @@ export default function Dashboard() {
             <Layers className="w-4 h-4" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Heatmap</span>
           </MagneticButton>
-          <MagneticButton onClick={() => setSatelliteMode(true)} variant="danger" className="w-full p-3">
+          <MagneticButton onClick={() => navigate('/satellite')} variant="danger" className="w-full p-3">
             <div className="flex items-center justify-center gap-2">
               <Target className="w-4 h-4" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">Recon Satellite</span>
             </div>
           </MagneticButton>
-          <MagneticButton onClick={() => setCameraMode(true)} variant="ghost" className="w-full p-3 bg-accent-glow text-accent-primary">
+          <MagneticButton onClick={() => navigate('/satellite')} variant="ghost" className="w-full p-3 bg-accent-glow text-accent-primary">
             <div className="flex items-center justify-center gap-2">
               <Camera className="w-4 h-4" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">CCTV Feed</span>
@@ -427,34 +430,6 @@ export default function Dashboard() {
       <AnimatePresence>
         {sidebarOpen && selectedMmsi && !selectedPortId && <VesselDetailPanel mmsi={selectedMmsi} onClose={clearSelection} />}
         {selectedPortId && <PortStatusPanel portId={selectedPortId} onClose={() => setSelectedPortId(null)} />}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {satelliteMode && (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-bg-base/80" onClick={() => setSatelliteMode(false)}>
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-panel w-[900px] overflow-hidden flex flex-col bg-bg-base" onClick={e => e.stopPropagation()}>
-              <div className="p-4 border-b border-bg-border flex justify-between bg-bg-surface items-center"><span className="text-[11px] font-black tracking-widest uppercase">Satellite Uplink 4-A</span><X className="w-5 h-5 cursor-pointer" onClick={() => setSatelliteMode(false)} /></div>
-              <div className="p-4 flex gap-4 h-[500px]">
-                <div className="flex-1 bg-black relative rounded overflow-hidden">
-                   <img src={mockSatelliteDetection.image_url} className="w-full h-full object-cover opacity-60" alt="" />
-                   {mockSatelliteDetection.detections.map((d, i) => (<div key={i} style={{ position: 'absolute', left: `${(d.xmin/800)*100}%`, top: `${(d.ymin/600)*100}%`, width: `${((d.xmax-d.xmin)/800)*100}%`, height: `${((d.ymax-d.ymin)/600)*100}%`, border: '2px solid #ff3366' }} />))}
-                </div>
-                <div className="w-64 space-y-4">
-                  <div className="p-4 rounded bg-bg-elevated border border-bg-border"><p className="text-[9px] text-text-muted font-bold uppercase mb-2">Targets</p><p className="text-2xl font-black text-status-danger">{mockSatelliteDetection.count}</p></div>
-                  <div className="p-4 rounded bg-status-danger/5 border border-status-danger/20"><ShieldAlert className="w-5 h-5 text-status-danger mb-2" /><p className="text-[10px] text-text-muted leading-tight">Unauthorized vessels detected outside AIS lanes. Surveillance protocols initiated.</p></div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-        {cameraMode && (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-bg-base/80" onClick={() => setCameraMode(false)}>
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="glass-panel w-[800px] overflow-hidden bg-black" onClick={e => e.stopPropagation()}>
-              <div className="p-4 border-b border-white/10 flex justify-between bg-bg-surface items-center"><span className="text-[11px] font-black tracking-widest uppercase">Live CCTV: Tanger Med</span><X className="w-5 h-5 cursor-pointer" onClick={() => setCameraMode(false)} /></div>
-              <div className="aspect-video relative"><img src="https://picsum.photos/1280/720?grayscale" className="w-full h-full object-cover opacity-80" alt="" /><div className="absolute top-4 left-4 p-2 bg-black/60 border border-white/20"><p className="text-[10px] font-mono text-status-safe">LIVE ● {time.toLocaleTimeString()}</p></div></div>
-            </motion.div>
-          </div>
-        )}
       </AnimatePresence>
 
       <AnimatePresence>

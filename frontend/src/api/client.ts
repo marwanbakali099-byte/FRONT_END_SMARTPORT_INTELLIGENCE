@@ -3,7 +3,7 @@ import axios from 'axios';
 // ==========================================
 // MOCK DATA FLAG
 // ==========================================
-export const USE_MOCK = true; // Set to false when Django backend is ready
+export const USE_MOCK = false; // Set to false when Django backend is ready
 // ==========================================
 
 export const apiClient = axios.create({
