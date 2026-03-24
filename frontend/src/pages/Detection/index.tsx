@@ -35,22 +35,34 @@ export default function Detection() {
   // Derive alerts from detection data
   const alerts: Alert[] = useMemo(() => {
     if (!data?.features) return [];
+    
+    // Fonction pour déterminer la vitesse limite par type de bateau
+    const getSpeedLimit = (shipType: number) => {
+      if (shipType >= 40 && shipType < 50) return 30; // Haute vitesse
+      if (shipType >= 60 && shipType < 70) return 22; // Passagers/Ferry
+      if (shipType >= 30 && shipType < 40) return 15; // Pêche
+      return 18; // Cargo, Tankers, Autres
+    };
+
     return data.features
-      .filter((f) => f.properties.speed > 10 || f.properties.source === 'satellite')
+      .filter((f) => f.properties.speed > getSpeedLimit(f.properties.ship_type || 30) || f.properties.source === 'satellite')
       .slice(0, 50)
       .map((f, i) => {
-        const isHighSpeed = f.properties.speed > 15;
+        const speedLimit = getSpeedLimit(f.properties.ship_type || 30);
+        const isSpeeding = f.properties.speed > speedLimit;
         const isSatellite = f.properties.source === 'satellite';
+        
         return {
           id: `alert-${f.id}-${i}`,
-          mmsi: f.properties.mmsi,
-          type: isHighSpeed ? 'high_speed' as const : isSatellite ? 'anomaly' as const : 'zone_entry' as const,
-          severity: isHighSpeed ? 'HIGH' as const : isSatellite ? 'MEDIUM' as const : 'LOW' as const,
-          message: isHighSpeed
-            ? `High speed detected: ${formatSpeed(f.properties.speed)}`
+          mmsi: String(f.properties.mmsi || f.id),
+          type: isSpeeding ? 'high_speed' as const : isSatellite ? 'anomaly' as const : 'zone_entry' as const,
+          severity: isSpeeding && f.properties.speed > speedLimit + 5 ? 'HIGH' as const : 
+                   (isSpeeding || isSatellite) ? 'MEDIUM' as const : 'LOW' as const,
+          message: isSpeeding
+            ? `Infraction de vitesse: ${formatSpeed(f.properties.speed)} (Limite: ${speedLimit}kn)`
             : isSatellite
-            ? `Satellite detection — unidentified vessel`
-            : `Zone entry detected`,
+            ? `Cible non identifiée (Imagerie Satellite)`
+            : `Entrée de zone non déclarée`,
           lat: f.geometry.coordinates[1],
           lon: f.geometry.coordinates[0],
           speed: f.properties.speed,
@@ -81,21 +93,21 @@ export default function Detection() {
   const severityTheme = {
     HIGH: {
       icon: <ShieldAlert className="w-4 h-4 text-status-danger" />,
-      label: '[CRITICAL_THREAT]',
+      label: '[EXCESSIVE_SPEED_ALERT]',
       bg: 'bg-status-danger/5 border-status-danger/30',
       text: 'text-status-danger',
       glow: 'shadow-[0_0_15px_rgba(255,51,102,0.1)]'
     },
     MEDIUM: {
       icon: <Zap className="w-4 h-4 text-status-warn" />,
-      label: '[KINETIC_ANOMALY]',
+      label: '[UNVERIFIED_TARGET]',
       bg: 'bg-status-warn/5 border-status-warn/30',
       text: 'text-status-warn',
       glow: 'shadow-[0_0_15px_rgba(255,170,0,0.1)]'
     },
     LOW: {
       icon: <Eye className="w-4 h-4 text-accent-primary" />,
-      label: '[SECTOR_LOG]',
+      label: '[ROUTINE_TRACKING]',
       bg: 'bg-accent-primary/5 border-accent-primary/20',
       text: 'text-accent-primary',
       glow: 'shadow-[0_0_15px_rgba(0,212,255,0.05)]'

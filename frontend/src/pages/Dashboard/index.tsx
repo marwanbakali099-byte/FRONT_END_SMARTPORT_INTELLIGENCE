@@ -260,10 +260,10 @@ function VesselDetailPanel({ mmsi, onClose }: { mmsi: string; onClose: () => voi
 
 export default function Dashboard() {
   const { selectedMmsi, selectVessel, clearSelection, sidebarOpen } = useVesselStore();
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'ais' | 'satellite'>('all');
   const [selectedPortId, setSelectedPortId] = useState<number | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'ais' | 'satellite'>('all');
   const [heatmapEnabled, setHeatmapEnabled] = useState(false);
-  const [activeAlert, setActiveAlert] = useState<{ mmsi: string } | null>(null);
+  const [activeAlert, setActiveAlert] = useState<{ mmsi: string, title: string, desc: string, severity: 'danger' | 'warn' } | null>(null);
 
   const [mapCenter, setMapCenter] = useState<[number, number]>([35.84, -5.65]);
   const [mapZoom, setMapZoom] = useState(10);
@@ -288,8 +288,6 @@ export default function Dashboard() {
     return data.features.filter((f) => f.properties.source === sourceFilter);
   }, [data, sourceFilter]);
 
-
-
   const uniqueVessels = useMemo(() => {
     const map = new Map<string, DetectionFeature>();
     filteredFeatures.forEach((f) => {
@@ -306,20 +304,44 @@ export default function Dashboard() {
   }, [filteredFeatures]);
 
   useEffect(() => {
-    if (uniqueVessels.length > 0) {
-      const suspicious = uniqueVessels.find(v => {
+    if (uniqueVessels.length > 0 && !activeAlert) {
+      let alertTriggered = false;
+      
+      for (const v of uniqueVessels) {
         const props = v.properties || {};
         const speed = props.speed ?? 0;
         const mmsi = String(props.mmsi || '');
+        const source = props.source || 'ais';
         const [lon, lat] = v.geometry?.coordinates || [0, 0];
-        const isInPort = (Math.abs(lat - 35.89) < 0.02 || Math.abs(lat - 35.78) < 0.02);
-        void lon;
-        return speed === 0 && !isInPort && !mmsi.startsWith('242');
-      });
+        const isInPortApproach = (Math.abs(lat - 35.89) < 0.05 || Math.abs(lat - 35.78) < 0.05) && (Math.abs(lon - -5.50) < 0.05 || Math.abs(lon - -5.80) < 0.05);
 
-      if (suspicious && !activeAlert) {
-         setActiveAlert({ mmsi: String(suspicious.properties?.mmsi || suspicious.id || '') });
-         setTimeout(() => setActiveAlert(null), 10000);
+        // THREAT 1: Dark Vessel (Satellite Detection uncorrelated with AIS)
+        if (source === 'satellite') {
+           setActiveAlert({ 
+             mmsi: mmsi,
+             title: 'CRITICAL: DARK VESSEL DETECTED',
+             desc: 'Cible satellite non-corrélée avec le flux AIS. Navire fantôme potentiel.',
+             severity: 'danger'
+           });
+           alertTriggered = true;
+           break;
+        }
+
+        // THREAT 2: Severe Speeding in Port Approach
+        if (isInPortApproach && speed > 22 && source === 'ais') {
+           setActiveAlert({ 
+             mmsi: mmsi,
+             title: 'WARNING: EXCESSIVE APPROACH SPEED',
+             desc: `Navire évoluant à ${speed} kn dans la zone d'approche portuaire nord. Risque de collision élevé.`,
+             severity: 'warn'
+           });
+           alertTriggered = true;
+           break;
+        }
+      }
+
+      if (alertTriggered) {
+         setTimeout(() => setActiveAlert(null), 12000);
       }
     }
   }, [uniqueVessels, activeAlert]);
@@ -405,13 +427,13 @@ export default function Dashboard() {
             <Layers className="w-4 h-4" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Heatmap</span>
           </MagneticButton>
-          <MagneticButton onClick={() => navigate('/satellite')} variant="danger" className="w-full p-3">
+          <MagneticButton variant="danger" className="w-full p-3">
             <div className="flex items-center justify-center gap-2">
               <Target className="w-4 h-4" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">Recon Satellite</span>
             </div>
           </MagneticButton>
-          <MagneticButton onClick={() => navigate('/satellite')} variant="ghost" className="w-full p-3 bg-accent-glow text-accent-primary">
+          <MagneticButton variant="ghost" className="w-full p-3 bg-accent-glow text-accent-primary">
             <div className="flex items-center justify-center gap-2">
               <Camera className="w-4 h-4" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">CCTV Feed</span>
@@ -444,15 +466,26 @@ export default function Dashboard() {
 
       <AnimatePresence>
         {activeAlert && (
-          <motion.div initial={{ y: 100, x: '-50%', opacity: 0 }} animate={{ y: 0, x: '-50%', opacity: 1 }} exit={{ y: 100, x: '-50%', opacity: 0 }} className="fixed bottom-24 left-1/2 z-[2500] w-[400px] glass-panel bg-status-danger/10 border-status-danger/50 p-4 shadow-2xl">
+          <motion.div initial={{ y: 100, x: '-50%', opacity: 0 }} animate={{ y: 0, x: '-50%', opacity: 1 }} exit={{ y: 100, x: '-50%', opacity: 0 }} 
+            className={clsx(
+              "fixed bottom-24 left-1/2 z-[2500] w-[400px] glass-panel p-4 shadow-2xl",
+              activeAlert.severity === 'danger' ? "bg-status-danger/10 border-status-danger/50" : "bg-status-warn/10 border-status-warn/50"
+            )}>
             <div className="flex gap-4">
-              <div className="w-10 h-10 rounded bg-status-danger flex items-center justify-center animate-pulse"><ShieldAlert className="w-6 h-6 text-white" /></div>
+              <div className={clsx(
+                "w-10 h-10 rounded flex items-center justify-center animate-pulse",
+                activeAlert.severity === 'danger' ? "bg-status-danger" : "bg-status-warn"
+              )}><ShieldAlert className="w-6 h-6 text-white" /></div>
               <div className="flex-1">
-                <p className="text-[10px] font-black text-status-danger tracking-widest uppercase mb-1">Alerte IA: Suspicion de fraude</p>
-                <p className="text-sm font-black text-text-primary font-mono">{activeAlert.mmsi}</p>
+                <p className={clsx(
+                  "text-[10px] font-black tracking-widest uppercase mb-1",
+                   activeAlert.severity === 'danger' ? "text-status-danger" : "text-status-warn"
+                )}>{activeAlert.title}</p>
+                <p className="text-sm font-black text-text-primary font-mono">ID / MMSI : {activeAlert.mmsi}</p>
+                <p className="text-[9px] font-mono mt-1 text-text-muted">{activeAlert.desc}</p>
                 <div className="mt-4 flex gap-2">
-                  <MagneticButton variant="danger" onClick={() => { selectVessel(activeAlert.mmsi); setActiveAlert(null); }} className="flex-1 py-1.5">Investiguer</MagneticButton>
-                  <MagneticButton variant="ghost" onClick={() => setActiveAlert(null)} className="px-3 py-1.5">Ignorer</MagneticButton>
+                  <MagneticButton variant={activeAlert.severity === 'danger' ? "danger" : "primary"} onClick={() => { selectVessel(activeAlert.mmsi); setActiveAlert(null); }} className="flex-1 py-1.5 text-[10px]">VERROUILLER LA CIBLE</MagneticButton>
+                  <MagneticButton variant="ghost" onClick={() => setActiveAlert(null)} className="px-3 py-1.5 text-[10px]">Quittance (Dismiss)</MagneticButton>
                 </div>
               </div>
             </div>
