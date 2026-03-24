@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Circle, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useQuery } from '@tanstack/react-query';
 import { getDetections } from '../../api/detections';
@@ -216,13 +216,13 @@ function VesselDetailPanel({ mmsi, onClose }: { mmsi: string; onClose: () => voi
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded border border-bg-border bg-bg-surface group hover:border-accent-primary/50 transition-colors">
+                <div className="p-4 rounded border border-bg-border bg-bg-surface">
                   <p className="text-[9px] text-text-muted font-bold uppercase mb-2">ETA (PREDICTED)</p>
                   <p className="text-2xl font-black font-mono text-text-primary leading-tight">
                     {data.eta_predite_minutes}<span className="text-xs font-sans text-text-muted ml-1">min</span>
                   </p>
                 </div>
-                <div className="p-4 rounded border border-bg-border bg-bg-surface group hover:border-accent-primary/50 transition-colors">
+                <div className="p-4 rounded border border-bg-border bg-bg-surface">
                   <p className="text-[9px] text-text-muted font-bold uppercase mb-2">TELEMETRY SPEED</p>
                   <p className="text-2xl font-black font-mono text-text-primary leading-tight">
                     {data.vitesse_actuelle}<span className="text-xs font-sans text-text-muted ml-1">kn</span>
@@ -382,9 +382,8 @@ export default function Dashboard() {
         {[
           { pos: [35.788, -5.808], name: "Tanger Ville", id: 6 },
           { pos: [35.890, -5.500], name: "Tanger Med", id: 7 },
-          { pos: [33.605, -7.595], name: "Casablanca", id: 8 },
         ].map(port => (
-          <CircleMarker key={port.id} center={port.pos as [number, number]} radius={20} pathOptions={{ fillColor: '#00d4ff', fillOpacity: 0.1, color: '#00d4ff', weight: 1, dashArray: '5, 5' }} eventHandlers={{ click: () => setSelectedPortId(port.id) }}>
+          <Circle key={port.id} center={port.pos as [number, number]} radius={3500} pathOptions={{ fillColor: '#00d4ff', fillOpacity: 0.1, color: '#00d4ff', weight: 1, dashArray: '5, 5' }} eventHandlers={{ click: () => setSelectedPortId(port.id) }}>
             <Popup className="premium-popup">
               <div className="p-1">
                 <span className="text-[10px] font-bold text-accent-primary uppercase tracking-widest">Strategic Port Hub</span>
@@ -393,7 +392,7 @@ export default function Dashboard() {
                 <button onClick={() => setSelectedPortId(port.id)} className="w-full py-1.5 bg-accent-primary/10 border border-accent-primary/30 text-[9px] font-black uppercase text-accent-primary hover:bg-accent-primary transition-all">Intel Summary</button>
               </div>
             </Popup>
-          </CircleMarker>
+          </Circle>
         ))}
       </MapContainer>
 
@@ -427,13 +426,13 @@ export default function Dashboard() {
             <Layers className="w-4 h-4" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Heatmap</span>
           </MagneticButton>
-          <MagneticButton variant="danger" className="w-full p-3">
+          <MagneticButton variant="danger" className="w-full p-3" onClick={() => navigate('/satellite')}>
             <div className="flex items-center justify-center gap-2">
               <Target className="w-4 h-4" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">Recon Satellite</span>
             </div>
           </MagneticButton>
-          <MagneticButton variant="ghost" className="w-full p-3 bg-accent-glow text-accent-primary">
+          <MagneticButton variant="ghost" className="w-full p-3 bg-accent-glow text-accent-primary" onClick={() => navigate('/satellite')}>
             <div className="flex items-center justify-center gap-2">
               <Camera className="w-4 h-4" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">CCTV Feed</span>

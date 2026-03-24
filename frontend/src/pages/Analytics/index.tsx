@@ -21,8 +21,6 @@ import type { PortStatusResponse, PortCongestionIAResponse, PortAnalyticsRespons
 const PORTS = [
   { id: 6, name: 'Tanger Ville' },
   { id: 7, name: 'Tanger Med' },
-  { id: 8, name: 'Casablanca' },
-  { id: 9, name: 'Nador' },
 ];
 
 const getCongestionColor = (level: string) => {
